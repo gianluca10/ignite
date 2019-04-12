@@ -7,6 +7,7 @@ import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.multicast.TcpDiscoveryMulticastIpFinder;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.cache.CacheMode;
+import org.apache.ignite.cache.CachePeekMode;
 import gc.dto.*;
 import org.apache.ignite.cache.query.SqlQuery;
 import org.apache.ignite.cache.query.SqlFieldsQuery;
@@ -19,7 +20,7 @@ public class App
     private static final String PERSON_CACHE_NAME = App.class.getSimpleName() + "-persons";
     private static final String PRODUCT_CACHE_NAME = App.class.getSimpleName() + "-products";
     private static final String ORDER_CACHE_NAME = App.class.getSimpleName() + "-orders";
-    private static long order_count = 0l;
+    private static int order_count = 0;
 
 
     public static void main( String[] args )
@@ -71,24 +72,30 @@ public class App
         //   Product pr8 = new Product(8, "Jam", 3.0f, 100, 0);
         //   Product pr9 = new Product(9, "Cheery", 8.0f, 100, 0);
         //   Product pr10 = new Product(10, "Wood", 1.0f, 100, 0);
-        // TESTING 2 POSITIVE CASES
-//        placeOrder("Rebecca Sanna", "Oil", 5);
-//        placeOrder("Marta Guerra", "Gold", 33);
-//        // TESTING NON EXISTING PRODUCT
-//        placeOrder("Marzia Lombardi", "Jamail", 21);
-//        // TESTING NON EXISTING PERSON
-//        placeOrder("Marzio Lombardi", "Jam", 1);
-//        // TESTING NOT SUFFICIENT QUANTITY 
-//        placeOrder("Marika D’angelo", "Gold", 77);
-        IgniteCache< Long, Order> test = Ignition.ignite().cache(ORDER_CACHE_NAME);
-        Order order = new Order(1l,1l,1l, 200);
-        test.put(1l, order);    
-        //print_order_storage_view();
+        // TESTING 3 POSITIVE CASES
+        placeOrder("Rebecca Sanna", "Oil", 5);
+        placeOrder("Marta Guerra", "Gold", 33);
+        placeOrder("Marzia Lombardi", "Jam", 10);
+        // TESTING NON EXISTING PRODUCT
+        placeOrder("Marzia Lombardi", "Jamail", 21);
+        // TESTING NON EXISTING PERSON
+        placeOrder("Marzio Lombardi", "Jam", 1);
+        // TESTING NOT SUFFICIENT QUANTITY 
+        placeOrder("Marika D’angelo", "Gold", 77);
+        placeOrder("Marika D’angelo", "Gold", 77);
+        placeOrder("Marika D’angelo", "Gold", 77);
+        printOrders();
         ignite.close();
     }
 
+    private static void printOrders(){
+        IgniteCache< Integer, Order> cache = Ignition.ignite().cache(ORDER_CACHE_NAME);
+        for (int i = 1; i <= order_count; i++)
+                    System.out.println("Got [key=" + i + ", val=" + cache.get(i).toString() + ']');
+    }
+
     private static boolean placeOrder(String name, String product, int quantity){
-        IgniteCache< Long, Order> cache = Ignition.ignite().cache(ORDER_CACHE_NAME);
+        IgniteCache< Integer, Order> cache = Ignition.ignite().cache(ORDER_CACHE_NAME);
         Long personId = getPersonIdFromName(name);
         Long productId = getProductIdFromName(product);
         if (personId < 1){
@@ -104,12 +111,20 @@ public class App
            System.out.println("NOT ENOUGH " + product + " IN STORAGE");
           return false; 
         }
-        order_count += 1l;
+        order_count += 1;
         Order order = new Order(order_count, personId, productId, quantity);
         cache.put(order_count, order);
+        decrease_in_stock_quantity(productId,available_quantity - quantity );
         return true;
     }
     
+    private static void decrease_in_stock_quantity(long productId, int quantity)
+    {
+        String query = String.format("UPDATE Product SET quantity_in_stock = %d WHERE id = %d", quantity, productId);
+        IgniteCache< Integer, Product> cache = Ignition.ignite().cache(PRODUCT_CACHE_NAME);
+    	SqlFieldsQuery sql = new SqlFieldsQuery(query);
+        cache.query(sql);
+    } 
     
 /*    private static int getProductIdFromName(String name) {
         IgniteCache< Integer, Product> cache = Ignition.ignite().cache(PRODUCT_CACHE_NAME);

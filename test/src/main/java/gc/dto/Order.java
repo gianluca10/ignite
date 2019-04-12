@@ -45,6 +45,10 @@ public class Order {
       {
         return quantity;
       }
+      public String toString()
+      {
+        return String.format("ORDER: %6d | CLIENT: %4d | PRODUCT: %4d | QUANTITY: %4d", id, personId, productId, quantity);
+      }
       public Order(Order o)
       {
          id = o.getId();
