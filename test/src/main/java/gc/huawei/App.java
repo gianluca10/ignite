@@ -107,17 +107,40 @@ public class App
             return false;
         }
         int available_quantity = getProductQuantityFromId(productId);
-        if (available_quantity < quantity) {
+        int inOrderQuantity = getInOrderQuantity(productId);
+        if (inOrderQuantity +  quantity > available_quantity) {
            System.out.println("NOT ENOUGH " + product + " IN STORAGE");
           return false; 
         }
         order_count += 1;
         Order order = new Order(order_count, personId, productId, quantity);
         cache.put(order_count, order);
-        decrease_in_stock_quantity(productId,available_quantity - quantity );
+        increaseInOrderQuantity(productId, quantity, inOrderQuantity);
         return true;
     }
-    
+
+    private static void increaseInOrderQuantity(long productId, int quantity, int inOrderQuantity)
+    {
+        String query = String.format("UPDATE Product SET quantity_in_order = %d WHERE id = %d", quantity + inOrderQuantity, productId);
+        IgniteCache< Integer, Product> cache = Ignition.ignite().cache(PRODUCT_CACHE_NAME);
+    	SqlFieldsQuery sql = new SqlFieldsQuery(query);
+        cache.query(sql);
+    } 
+
+    private static int getInOrderQuantity(long productId){
+        String result;
+        String qrysql = String.format("SELECT SUM(quantity_in_order) from Product WHERE id = %d", productId);
+        IgniteCache< Integer, Product> cache = Ignition.ignite().cache(PRODUCT_CACHE_NAME);
+    	SqlFieldsQuery sql = new SqlFieldsQuery(qrysql);
+        try (QueryCursor<List<?>> cursor = cache.query(sql)) {
+        for (List<?> row : cursor){
+            result = "" + row.get(0);
+            return Integer.parseInt(result);
+        }
+        }
+        return 0;
+    }
+
     private static void decrease_in_stock_quantity(long productId, int quantity)
     {
         String query = String.format("UPDATE Product SET quantity_in_stock = %d WHERE id = %d", quantity, productId);
